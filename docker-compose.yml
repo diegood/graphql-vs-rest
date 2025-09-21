@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: demo_db
+    environment:
+      POSTGRES_DB: demo
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+
+  rest:
+    build: ./rest-api
+    container_name: demo_rest
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: demo
+      PGUSER: demo
+      PGPASSWORD: demo
+      PORT: 3000
+    depends_on:
+      db:
+        condition: service_healthy
+      graphql:
+        condition: service_started
+    ports:
+      - "3000:3000"
+
+  graphql:
+    build: ./gql-api
+    container_name: demo_graphql
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: demo
+      PGUSER: demo
+      PGPASSWORD: demo
+      PORT: 4000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+  hasura:
+    image: hasura/graphql-engine:v2.42.0
+    container_name: demo_hasura
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      graphql:
+        condition: service_started
+    environment:
+      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://demo:demo@db:5432/demo
+      PG_DATABASE_URL: postgres://demo:demo@db:5432/demo
+      HASURA_GRAPHQL_DATABASE_URL: postgres://demo:demo@db:5432/demo
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"         
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_ADMIN_SECRET: demo     
+      HASURA_GRAPHQL_CORS_DOMAIN: "*"              
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anonymous

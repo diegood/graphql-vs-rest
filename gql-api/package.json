@@ -1,0 +1,16 @@
+{
+  "name": "gql-api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.28.1",
+    "mercurius": "^13.3.3",
+    "pg": "^8.11.5",
+    "graphql-type-json": "^0.3.2"
+
+  }
+}
