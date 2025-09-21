@@ -51,22 +51,22 @@ services:
         condition: service_healthy
     ports:
       - "4000:4000"
-  hasura:
-    image: hasura/graphql-engine:v2.42.0
-    container_name: demo_hasura
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-      graphql:
-        condition: service_started
-    environment:
-      HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://demo:demo@db:5432/demo
-      PG_DATABASE_URL: postgres://demo:demo@db:5432/demo
-      HASURA_GRAPHQL_DATABASE_URL: postgres://demo:demo@db:5432/demo
-      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"         
-      HASURA_GRAPHQL_DEV_MODE: "true"
-      HASURA_GRAPHQL_ADMIN_SECRET: demo     
-      HASURA_GRAPHQL_CORS_DOMAIN: "*"              
-      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anonymous
+  # hasura:
+  #   image: hasura/graphql-engine:v2.42.0
+  #   container_name: demo_hasura
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     graphql:
+  #       condition: service_started
+  #   environment:
+  #     HASURA_GRAPHQL_METADATA_DATABASE_URL: postgres://demo:demo@db:5432/demo
+  #     PG_DATABASE_URL: postgres://demo:demo@db:5432/demo
+  #     HASURA_GRAPHQL_DATABASE_URL: postgres://demo:demo@db:5432/demo
+  #     HASURA_GRAPHQL_ENABLE_CONSOLE: "true"         
+  #     HASURA_GRAPHQL_DEV_MODE: "true"
+  #     HASURA_GRAPHQL_ADMIN_SECRET: demo     
+  #     HASURA_GRAPHQL_CORS_DOMAIN: "*"              
+  #     HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anonymous
