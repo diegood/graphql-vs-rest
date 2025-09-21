@@ -1,12 +1,12 @@
 import Fastify from 'fastify';
-import { query } from './db.js';
-import mercurius, { gql } from 'mercurius';
-
+import mercurius from 'mercurius';
 import GraphQLJSON from 'graphql-type-json';
+import { query } from './db.js';
 
-const { PubSub } = mercurius;
-const pubsub = new PubSub();
+import { gql } from 'mercurius-codegen';
 
+
+const { ErrorWithProps } = mercurius;
 const app = Fastify({ logger: true });
 
 const schema = gql`
@@ -22,9 +22,11 @@ const schema = gql`
     amigos: [Usuario!]!
     pedidos(limit: Int = 10, offset: Int = 0): [Pedido!]!
   }
+
   type Producto { id: ID!, nombre: String!, precio: Float! }
   type ItemPedido { id: ID!, cantidad: Int!, producto: Producto }
   type Pago { metodo: String!, detalles: JSON }
+
   type Pedido {
     id: ID!
     fecha: String
@@ -35,15 +37,15 @@ const schema = gql`
     usuario: Usuario
   }
 
+  type Query {
+    usuario(id: ID!): Usuario
+    pedidos(estado: String, limit: Int = 10, offset: Int = 0): [Pedido!]!
+    producto: [Producto]
+  }
 
   input ItemInput { productoId: ID!, cantidad: Int! }
   input PagoInput { metodo: String!, detalles: JSON }
   input CrearPedidoInput { usuarioId: ID!, items: [ItemInput!]!, pago: PagoInput! }
-
-  type Query {
-    usuario(id: ID!): Usuario
-    pedidos(estado: String, limit: Int = 10, offset: Int = 0): [Pedido!]!
-  }
 
   type Mutation {
     crearPedido(input: CrearPedidoInput!): Pedido!
@@ -58,17 +60,26 @@ const schema = gql`
 const resolvers = {
   JSON: GraphQLJSON,
 
-
   Subscription: {
     nuevoPedido: {
-        subscribe: async (_, __, { pubsub }) => pubsub.subscribe('NUEVO_PEDIDO'),
-        resolve: (payload) => payload
-    },
+      subscribe: async (_, __, { pubsub }) => pubsub.subscribe('NUEVO_PEDIDO'),
+      resolve: (payload) => payload
+    }
   },
 
   Query: {
-    usuario: async (_, { id }) =>
-      (await query('SELECT * FROM usuarios WHERE id=$1', [id]))[0] || null,
+    usuario: async (_, { id }) => {
+      const user = (await query('SELECT * FROM usuarios WHERE id=$1', [id]))[0];
+      if (!user) {
+        throw new ErrorWithProps(
+          `Usuario no encontrado, el id ${id} no existe. sera que es por que es una demo?`,
+          { code: 'NOT_FOUND', entity: 'Usuario', id },
+          404 // esto es el statusCode es opcional pero resulta muy útil para logs/proxies externos (Si no se lee me tengo que acordar de decirlo en voz alta)
+        );
+      }
+      return user;
+    },
+
     pedidos: async (_, { estado, limit, offset }) => {
       const clauses = [];
       const params = [];
@@ -79,7 +90,10 @@ const resolvers = {
         `SELECT * FROM pedidos ${where} ORDER BY fecha DESC LIMIT $${params.length-1} OFFSET $${params.length}`,
         params
       );
-    }
+    },
+
+    producto: async () =>
+      (await query('SELECT * FROM productos')) || null
   },
 
   Usuario: {
@@ -112,8 +126,9 @@ const resolvers = {
   },
 
   Mutation: {
-    crearPedido: async (_, { input }) => {
+    crearPedido: async (_, { input }, { pubsub }) => {
       const { usuarioId, items, pago } = input;
+
       const productIds = items.map(i => Number(i.productoId));
       const placeholders = productIds.map((_, i) => `$${i + 1}`).join(',');
       const products = productIds.length
@@ -143,7 +158,9 @@ const resolvers = {
         'INSERT INTO pagos (pedido_id, metodo, detalles) VALUES ($1, $2, $3)',
         [pedido.id, pago.metodo, pago.detalles || {}]
       );
+
       await pubsub.publish({ topic: 'NUEVO_PEDIDO', payload: pedido });
+
       return pedido;
     },
 
@@ -157,7 +174,12 @@ const resolvers = {
   }
 };
 
-app.register(mercurius, { schema, resolvers, graphiql: true });
+app.register(mercurius, {
+  schema,
+  resolvers,
+  graphiql: true,
+  subscription: true 
+});
 
 app.get('/health', async () => ({ ok: true }));
 
